@@ -123,6 +123,35 @@ int levenshteinDistance(char* s1, char* s2){    // algorithm used to find simila
     return dp[n][m];
 }
 
+double jaroWinklerDistance(char* s1, char* s2) {    // jaro winkler similarity
+    if(strcmp(s1, s2)) return 1;
+    int n = strlen(s1), m = strlen(s2);
+    int max_dist = (n > m ? n : m)/2 - 1;
+    int match = 0;
+    int* h1 = calloc(n, sizeof(int));
+    int* h2 = calloc(m, sizeof(int));
+    for(int i=0; i<n; i++) {
+        for (int j=0>i-max_dist ? 0 : i-max_dist; j<(m<i+max_dist+1 ? m : max_dist+1); j++) {
+            if (s1[i] == s2[j] && h2[j] == 0) {
+				h1[i] = 1;
+				h2[j] = 1;
+				match++;
+				break;
+			}
+        }
+    }
+    if(match == 0) return 0;
+	double t = 0;
+	int point = 0;
+    for(int i=0; i<n; i++) {
+        if(h1[i]) {
+            while(h2[point] == 0) point++;
+            if (s1[i] != s2[point++]) t++;
+        }
+    }
+    return (((double)match) / ((double)n) + ((double)match) / ((double)m) + ((double)match - t/2) / ((double)match)) / 3.0;
+}
+
 int main() {
     // initializing bloom filter
     printf("Loading dictionary...");
