@@ -124,7 +124,7 @@ int levenshteinDistance(char* s1, char* s2){    // algorithm used to find simila
 }
 
 double jaroWinklerDistance(char* s1, char* s2) {    // jaro winkler similarity
-    if(strcmp(s1, s2)) return 1;
+    if(strcmp(s1, s2) == 0) return 1;
     int n = strlen(s1), m = strlen(s2);
     int max_dist = (n > m ? n : m)/2 - 1;
     int match = 0;
@@ -154,13 +154,12 @@ double jaroWinklerDistance(char* s1, char* s2) {    // jaro winkler similarity
 
 int main() {
     // initializing bloom filter
-    printf("Loading dictionary...");
     bool* filter = calloc(FILTER_SIZE, sizeof(bool));
     TRIE_NODE* root = createNode();
 
     // populating bloom filter and trie with dictionary
     loadDictionary(filter, root);
-    printf("Loaded Dictionary on Bloom Filter and Trie.");
+    printf("Loaded Dictionary on Bloom Filter and Trie.\n");
 
     // testing bloom filter
     while(1) {
@@ -174,7 +173,12 @@ int main() {
         printf("\nUsing Trie:");
         if(searchTrie(root, input)) printf("\nword present"); // search
         else printf("\nword not present");
+        printf("\nEnter word to compare: ");
+        char input2[50];
+        fscanf(stdin, "%s", input2);
+        for(int i = 0; input2[i]; i++) input2[i] = tolower(input2[i]);
+        printf("\nLevenshyein Distance: %d\nJaro-Winkler Similarity:%lf", levenshteinDistance(input, input2), jaroWinklerDistance(input, input2));
     }
-    
+
     return 0;
 }
