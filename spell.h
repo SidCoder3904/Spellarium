@@ -160,6 +160,126 @@ double jaroWinklerDistance(char* s1, char* s2) {
     return jaro;
 }
 
+struct queueNode{
+    char val[100];
+    struct queueNode* prev;
+    struct queueNode* forw;
+} *head, *tail;
+
+struct hshNode{
+    struct queueNode* nd;
+    struct hshNode* prev;
+    struct hshNode* forw;
+};
+
+struct queueNode* createQueueNode(char* string) {
+    struct queueNode* ans = (struct queueNode*)malloc(sizeof(struct queueNode));
+    strcpy(ans->val, string);
+    ans->forw = NULL;
+    ans->prev = NULL;
+    return ans;
+}
+
+struct hshNode* createHashNode(char* string){
+    struct hshNode* ans=(struct hshNode*)malloc(sizeof(struct hshNode));
+    ans->nd=createQueueNode(string);
+    ans->prev=NULL;
+    ans->forw=NULL;
+    return ans;
+}
+
+struct LRUCache{
+    struct hshNode** arr;
+    int size;
+    int maxSize;
+};
+
+
+struct LRUCache* lRUCacheCreate(int capacity) {
+    struct LRUCache* ans=(struct LRUCache*)malloc(sizeof(struct LRUCache));
+    ans->arr=(struct hshNode**)malloc(sizeof(struct hshNode*)*capacity);
+    for (int i=0; i<capacity; i++) ans->arr[i]=NULL;
+    ans->size=0;
+    ans->maxSize=capacity;
+    return ans;
+}
+
+void insert(struct queueNode* nd){
+    nd->prev = head;
+    nd->forw = head->forw;
+    head->forw->prev = nd;
+    head->forw = nd;
+}
+
+struct queueNode* deleteQueue(){
+    struct queueNode* previousNode = tail->prev;
+    previousNode->prev->forw = tail;
+    tail->prev = previousNode->prev;
+    return previousNode;
+}
+
+void deleteHsh(struct LRUCache* obj, struct queueNode* QNode){
+    int ind=djb2(QNode->val)%(obj->maxSize);
+    struct hshNode* temp=obj->arr[ind];
+    while (temp->nd!=QNode) temp=temp->forw;
+    if (obj->arr[ind]==temp) obj->arr[ind]=temp->forw;
+    else{
+        temp->prev->forw=temp->forw;
+        if (temp->forw!=NULL) temp->forw->prev=temp->prev;
+    }
+    free(temp);
+}
+
+void lRUCachePut(struct LRUCache* obj, char* string) {
+    int ind=djb2(string)%(obj->maxSize);
+    
+    if (obj->arr[ind]!=NULL){
+        struct hshNode* temp=obj->arr[ind];
+        obj->arr[ind]=createHashNode(string);
+        obj->arr[ind]->forw=temp;
+        temp->prev=obj->arr[ind];
+    }
+    else{
+        obj->arr[ind]=createHashNode(string);
+    }
+    insert(obj->arr[ind]->nd);
+    if (obj->size<obj->maxSize) obj->size++;
+    else{
+        struct queueNode* QNode=deleteQueue();
+        deleteHsh(obj, QNode);
+        free(QNode);
+    }
+}
+
+void printQueue(){
+    struct queueNode* temp=head->forw;
+    while (temp!=tail){
+        printf("%s ", temp->val);
+        temp=temp->forw;
+    }
+    printf("\n");
+}
+
+void createQueue(){
+    head=createQueueNode("");
+    tail=createQueueNode("");
+    head->forw=tail;
+    tail->prev=head;
+}
+
+struct hshNode* searchCache(struct LRUCache* obj, char* string){
+    int ind=djb2(string)%(obj->maxSize);
+    struct hshNode* temp=obj->arr[ind];
+    while (temp!=NULL && strcmp(temp->nd->val, string)!=0) temp=temp->forw;
+    return temp;
+}
+
+void lRUCacheGet(struct hshNode* temp){
+    temp->nd->prev->forw=temp->nd->forw;
+    temp->nd->forw->prev=temp->nd->prev;
+    insert(temp->nd);
+}
+
 // // testing the functions for correctness
 // int main() {
 //     // initializing bloom filter
