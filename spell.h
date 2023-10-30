@@ -31,6 +31,7 @@ uint32_t jenkin(const char* str) {
     return hash % FILTER_SIZE;
 }
 
+// Bloom Filter functions
 void insertFilter(bool* filter, char* word) {    // bloom filter insertion
     for(int i=0; i<K; i++) filter[(djb2(word)*i + jenkin(word))%FILTER_SIZE] = 1;
 }
