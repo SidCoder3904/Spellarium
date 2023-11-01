@@ -9,6 +9,7 @@
 #define N 26    // no. of distinct characters in language
 
 #define INT_MAX 2147483647
+#define COLOR_BLUE "\x1b[34m"
 #define COLOR_RED "\x1b[31m"
 #define COLOR_GREEN "\x1b[32m"
 #define COLOR_CYAN "\x1b[36m"
@@ -50,9 +51,9 @@ void insertFilter(bool* filter, char* word) {    // bloom filter insertion
     for(int i=0; i<K; i++) filter[(djb2(word)*i + jenkin(word))%FILTER_SIZE] = 1;
 }
 
-int searchFilter(bool* filter, char* word) {      // searching in bloom filter
-    for(int i=0; i<K; i++) if(!filter[(djb2(word)*i + jenkin(word))%FILTER_SIZE]) return 0;
-    return 1;
+bool searchFilter(bool* filter, char* word) {      // searching in bloom filter
+    for(int i=0; i<K; i++) if(!filter[(djb2(word)*i + jenkin(word))%FILTER_SIZE]) return false;
+    return true;
 }
 
 // Trie functions
@@ -62,12 +63,12 @@ int smallest(int a, int b, int c) {      // helper function returns min(a, b, c)
 
 typedef struct node {   // trie node
     struct node *child[26];
-    int isEOW;
+    bool isEOW;
 } TRIE_NODE;
 
 TRIE_NODE* createNode() {
     TRIE_NODE* pNode = (TRIE_NODE*)malloc(sizeof(TRIE_NODE));
-    pNode->isEOW = 0;
+    pNode->isEOW = false;
     for(int i=0; i<26; i++) pNode->child[i] = NULL;
     return pNode;
 }
@@ -80,15 +81,15 @@ void insertTrie(TRIE_NODE* root, char* word){
         if(!pCrawl->child[idx]) pCrawl->child[idx] = createNode();
         pCrawl = pCrawl->child[idx];
     }
-    pCrawl->isEOW = 1;
+    pCrawl->isEOW = true;
 }
 
-int searchTrie(TRIE_NODE* root, char* word){
+bool searchTrie(TRIE_NODE* root, char* word){
     TRIE_NODE* pCrawl = root;
     int len = strlen(word), idx;
     for(int i=0; i<len; i++) {
         idx = word[i] - 'a';
-        if(!pCrawl->child[idx]) return 0;
+        if(!pCrawl->child[idx]) return false;
         pCrawl = pCrawl->child[idx];
     }
     return (pCrawl->isEOW);
