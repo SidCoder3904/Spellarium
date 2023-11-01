@@ -4,11 +4,25 @@
 
 // Trie variables
 #define MAX_LENGTH 50
-#define MAX_SUGGESTIONS 100
-#define MAX_INCRT_WORDS 25
+#define MAX_SUGGESTIONS 10
+#define MAX_INCRT_WORDS 1000
 #define N 26    // no. of distinct characters in language
 
 #define INT_MAX 2147483647
+#define COLOR_RED "\x1b[31m"
+#define COLOR_GREEN "\x1b[32m"
+#define COLOR_CYAN "\x1b[36m"
+#define COLOR_MAGENTA "\x1b[35m"
+#define COLOR_YELLOW  "\x1b[33m"
+#define COLOR_RESET "\x1b[0m"
+
+int maxi(int x, int y){
+    return x>y?x:y;
+}
+
+int mini(int x, int y){
+    return x>y?y:x;
+}
 
 // hash functions
 uint32_t djb2(const char* string) {
@@ -100,64 +114,99 @@ void loadDictionary(bool* filter, TRIE_NODE* root){
     fclose(file);
 }
 
-int levenshteinDistance(char* s1, char* s2){    // algorithm used to find similar correct words
-    int n = strlen(s1), m = strlen(s2);
-    if(!(n & m)) return 0;
-    int cost = 0;
+int levenshteinDistance(const char *s, const char *t){
+    int n = strlen(s);
+    int m = strlen(t);
+
+    if (n == 0)
+        return m;
+    if (m == 0)
+        return n;
+
     int dp[MAX_LENGTH + 1][MAX_LENGTH + 1];
-    for(int i=0; i<=n; i++) dp[i][0] = i;
-    for(int j=0; j<=m; j++) dp[0][j] = j;
-    for(int i=1; i<=n; i++) {
-        for(int j=1; j<=m; j++) {
-            cost = (s1[i-1] == s2[j-1]) ? 0 : 1;
-            dp[i][j] = smallest(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + cost);
+    for (int i = 0; i <= n; i++)
+        dp[i][0] = i;
+    for (int j = 0; j <= m; j++)
+        dp[0][j] = j;
+
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 1; j <= m; j++)
+        {
+            int cost = (s[i - 1] == t[j - 1]) ? 0 : 1;
+            dp[i][j] = smallest(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
         }
     }
     return dp[n][m];
 }
 
-double jaroDistance(char* s1, char* s2) {    // jaro winkler similarity
-    if(strcmp(s1, s2) == 0) return 1;
-    int n = strlen(s1), m = strlen(s2);
-    int max_dist = (n > m ? n : m)/2 - 1;
+double jaroWinklerDistance(char* s1, char* s2){
+    // If the strings are equal
+    if (s1 == s2)
+        return 1.0;
+ 
+    // Length of two strings
+    int len1 = strlen(s1), len2 = strlen(s2);
+ 
+    // Maximum distance upto which matching
+    // is allowed
+    int max_dist = floor(maxi(len1, len2) / 2) - 1;
+ 
+    // Count of matches
     int match = 0;
-    int* h1 = (int*)calloc(n, sizeof(int));
-    int* h2 = (int*)calloc(m, sizeof(int));
-    for(int i=0; i<n; i++) {
-        for (int j=0>i-max_dist ? 0 : i-max_dist; j<(m<i+max_dist+1 ? m : max_dist+1); j++) {
-            if (s1[i] == s2[j] && h2[j] == 0) {
-				h1[i] = 1;
-				h2[j] = 1;
-				match++;
-				break;
-			}
-        }
+ 
+    // Hash for matches
+    int* hash_s1 = calloc(len1, sizeof(int));
+    int* hash_s2 = calloc(len2, sizeof(int));
+ 
+    // Traverse through the first string
+    for (int i = 0; i < len1; i++) {
+ 
+        // Check if there is any matches
+        for (int j = maxi(0, i - max_dist);
+             j < mini(len2, i + max_dist + 1); j++)
+ 
+            // If there is a match
+            if (s1[i] == s2[j] && hash_s2[j] == 0) {
+                hash_s1[i] = 1;
+                hash_s2[j] = 1;
+                match++;
+                break;
+            }
     }
-    if(match == 0) return 0;
-	double t = 0;
-	int point = 0;
-    for(int i=0; i<n; i++) {
-        if(h1[i]) {
-            while(h2[point] == 0) point++;
-            if (s1[i] != s2[point++]) t++;
+ 
+    // If there is no match
+    if (match == 0)
+        return 0.0;
+ 
+    // Number of transpositions
+    double t = 0;
+ 
+    int point = 0;
+ 
+    // Count number of occurrences
+    // where two characters match but
+    // there is a third matched character
+    // in between the indices
+    for (int i = 0; i < len1; i++)
+        if (hash_s1[i]) {
+ 
+            // Find the next matched character
+            // in second string
+            while (hash_s2[point] == 0)
+                point++;
+ 
+            if (s1[i] != s2[point++])
+                t++;
         }
-    }
-    return (((double)match) / ((double)n) + ((double)match) / ((double)m) + ((double)match - t/2) / ((double)match)) / 3.0;
-}
-
-double jaroWinklerDistance(char* s1, char* s2) {
-    double jaro = jaroDistance(s1, s2);
-    int n = strlen(s1), m = strlen(s2);
-    if(jaro>0.7) {
-        int prefix = 0;
-        for(int i=0; i<(n<m ? n : m); i++) {
-            if(s1[i]==s2[i]) prefix++;
-            else break;
-        }
-        prefix = 4 < prefix ? 4 : prefix;
-        jaro += 0.1 * prefix * (1 - jaro);
-    }
-    return jaro;
+ 
+    t /= 2;
+ 
+    // Return the Jaro Similarity
+    return (((double)match) / ((double)len1)
+            + ((double)match) / ((double)len2)
+            + ((double)match - t) / ((double)match))
+           / 3.0;
 }
 
 struct queueNode{
@@ -280,34 +329,36 @@ void lRUCacheGet(struct hshNode* temp){
     insert(temp->nd);
 }
 
-// // testing the functions for correctness
-// int main() {
-//     // initializing bloom filter
-//     bool* filter = calloc(FILTER_SIZE, sizeof(bool));
-//     TRIE_NODE* root = createNode();
+int suggest(char *word, struct LRUCache* obj, char suggestions[MAX_SUGGESTIONS][MAX_LENGTH + 1]){
 
-//     // populating bloom filter and trie with dictionary
-//     loadDictionary(filter, root);
-//     printf("Loaded Dictionary on Bloom Filter and Trie.\n");
+    char dict_word[MAX_LENGTH + 1];
 
-//     // testing bloom filter
-//     while(1) {
-//         printf("\nEnter word to search: ");
-//         char input[50];
-//         fscanf(stdin, "%s", input);
-//         for(int i = 0; input[i]; i++) input[i] = tolower(input[i]);
-//         printf("\nUsing Bloom Filter:");
-//         if(searchFilter(filter, input)) printf("\nword present"); // search
-//         else printf("\nword not present");
-//         printf("\nUsing Trie:");
-//         if(searchTrie(root, input)) printf("\nword present"); // search
-//         else printf("\nword not present");
-//         printf("\nEnter word to compare: ");
-//         char input2[50];
-//         fscanf(stdin, "%s", input2);
-//         for(int i = 0; input2[i]; i++) input2[i] = tolower(input2[i]);
-//         printf("\nLevenshyein Distance: %d\nJaro-Winkler Similarity: %lf", levenshteinDistance(input, input2), jaroWinklerDistance(input, input2));
-//     }
+    double tempJaroWinklerValue = 0;
+    int tempLevenshteinValue = INT_MAX;
+    FILE *file = fopen("dictionary.txt", "r");
 
-//     return 0;
-// }
+    while (fscanf(file, "%s", dict_word) != EOF){
+        int distance = levenshteinDistance(word, dict_word);
+        double jaroWinklerValue = jaroWinklerDistance(word, dict_word);
+        if (distance < tempLevenshteinValue){
+            tempLevenshteinValue=distance;
+            lRUCachePut(obj, dict_word);
+        }
+        else if (distance == tempLevenshteinValue && jaroWinklerValue >= tempJaroWinklerValue){
+            tempJaroWinklerValue=jaroWinklerValue;
+            lRUCachePut(obj, dict_word);
+        }
+    }
+
+    int num_suggestions = 0;
+    struct queueNode* temp=head->forw;
+    while (temp!=tail){
+        strcpy(suggestions[num_suggestions], temp->val);
+        num_suggestions++;
+        temp=temp->forw;
+    }
+
+    return num_suggestions;
+
+    fclose(file);
+}
