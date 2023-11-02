@@ -1,12 +1,13 @@
 # include <pthread.h>
 // Bloom Filter variables
 #define FILTER_SIZE 10000000
-#define K 8     // no. of hash functions
+#define K 1     // no. of hash functions
 
 // Trie variables
 #define MAX_LENGTH 50
 #define MAX_SUGGESTIONS 10
 #define MAX_INCRT_WORDS 1000
+#define CACHE_SIZE 100
 #define N 26    // no. of distinct characters in language
 
 #define INT_MAX 2147483647
@@ -313,25 +314,6 @@ void lRUCachePut(struct LRUCache* obj, char* string) {
     }
 }
 
-void printHshQueue(struct LRUCacheMapNode* nd){
-    while (nd!=NULL){
-        printf("%s ", nd->nd->val);
-        nd=nd->forw;
-    }
-    printf("\n");
-}
-
-void printCache(struct LRUCache* obj){
-    printf("\nThe elements in Hash Map are:\n");
-    for (int i=0; i<obj->maxSize; i++){
-        if (obj->map[i]!=NULL){
-            printHshQueue(obj->map[i]);
-        }
-        else printf("NULL\n");
-    }
-    printf("\n");
-}
-
 void printQueue(struct LRUCache* obj){
     printf("\nThe Cache Queue is: ");
     struct LRUCacheQueueNode* temp=obj->head->forw;
@@ -353,4 +335,16 @@ void LRUCacheGet(struct LRUCache* obj, struct LRUCacheMapNode* temp){
     temp->nd->prev->forw=temp->nd->forw;
     temp->nd->forw->prev=temp->nd->prev;
     insert(obj, temp->nd);
+}
+
+void removeNonAlphabetical(char *word) {
+    int i, j = 0;
+
+    for (i = 0; word[i] != '\0'; i++) {
+        if (isalpha(word[i])) {
+            word[j] = tolower(word[i]);
+            j++;
+        }
+    }
+    word[j] = '\0';
 }
