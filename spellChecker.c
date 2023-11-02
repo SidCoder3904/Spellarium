@@ -36,8 +36,8 @@ int suggest(char *word, struct LRUCache* obj, char suggestions[MAX_SUGGESTIONS][
     }
 
     int num_suggestions = 0;
-    struct queueNode* temp=head->forw;
-    while (temp!=tail){
+    struct LRUCacheQueueNode* temp=obj->head->forw;
+    while (temp!=obj->tail){
         strcpy(suggestions[num_suggestions], temp->val);
         num_suggestions++;
         temp=temp->forw;
@@ -53,7 +53,6 @@ int main() {
     TRIE_NODE* root=createNode();
     bool* filter = calloc(FILTER_SIZE, sizeof(bool));
     loadDictionary(dict_file, filter, root);
-    printf(COLOR_BLUE "Dictionary loaded successfully.\n" COLOR_RESET);
     int ch;
     char str[100];
     char word[MAX_LENGTH + 1];
@@ -67,8 +66,7 @@ int main() {
     bool checkTrie;
     bool checkFilter;
 
-    createQueue();
-    struct LRUCache* cache=lRUCacheCreate(MAX_SUGGESTIONS);
+    struct LRUCache* cache=createLRUCache(MAX_SUGGESTIONS);
 
     while (1){
         printf(COLOR_YELLOW "Select the mode you want to enter:-\n1. Spell checking and autocorrect\n2. Comparison mode\n3. Optimisation mode\n4. Quit\n" COLOR_RESET);

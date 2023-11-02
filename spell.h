@@ -214,69 +214,77 @@ double jaroWinklerDistance(char* s1, char* s2){
     return (((double)match) / ((double)len1) + ((double)match) / ((double)len2) + ((double)match - t) / ((double)match)) / 3.0;
 }
 
-struct queueNode{
+struct LRUCacheQueueNode{
     char val[100];
-    struct queueNode* prev;
-    struct queueNode* forw;
-} *head, *tail;
-
-struct hshNode{
-    struct queueNode* nd;
-    struct hshNode* prev;
-    struct hshNode* forw;
+    struct LRUCacheQueueNode* prev;
+    struct LRUCacheQueueNode* forw;
 };
 
-struct queueNode* createQueueNode(char* string) {
-    struct queueNode* ans = (struct queueNode*)malloc(sizeof(struct queueNode));
+struct LRUCacheMapNode{
+    struct LRUCacheQueueNode* nd;
+    struct LRUCacheMapNode* prev;
+    struct LRUCacheMapNode* forw;
+};
+
+struct LRUCacheQueueNode* createQueueNode(char* string) {
+    struct LRUCacheQueueNode* ans = (struct LRUCacheQueueNode*)malloc(sizeof(struct LRUCacheQueueNode));
     strcpy(ans->val, string);
     ans->forw = NULL;
     ans->prev = NULL;
     return ans;
 }
 
-struct hshNode* createHashNode(char* string){
-    struct hshNode* ans=(struct hshNode*)malloc(sizeof(struct hshNode));
+struct LRUCacheMapNode* createHashNode(char* string){
+    struct LRUCacheMapNode* ans=(struct LRUCacheMapNode*)malloc(sizeof(struct LRUCacheMapNode));
     ans->nd=createQueueNode(string);
     ans->prev=NULL;
     ans->forw=NULL;
     return ans;
 }
 
+struct LRUCacheMap{
+    struct LRUCacheMapNode** arr;
+};
+
 struct LRUCache{
-    struct hshNode** arr;
+    struct LRUCacheQueueNode *head, *tail;
+    struct LRUCacheMapNode** map;
     int size;
     int maxSize;
 };
 
+struct LRUCache* createLRUCache(int sz){
+    struct LRUCache* res=(struct LRUCache*)malloc(sizeof(struct LRUCache));
+    res->map=(struct LRUCacheMapNode**)malloc(sizeof(struct LRUCacheMapNode*)*sz);
+    for (int i=0; i<sz; i++) res->map[i]=NULL;
+    res->size=0;
+    res->maxSize=sz;
+    res->head=createQueueNode("");
+    res->tail=createQueueNode("");
+    res->head->forw=res->tail;
+    res->tail->prev=res->head;
+    return res;
+};
 
-struct LRUCache* lRUCacheCreate(int capacity) {
-    struct LRUCache* ans=(struct LRUCache*)malloc(sizeof(struct LRUCache));
-    ans->arr=(struct hshNode**)malloc(sizeof(struct hshNode*)*capacity);
-    for (int i=0; i<capacity; i++) ans->arr[i]=NULL;
-    ans->size=0;
-    ans->maxSize=capacity;
-    return ans;
+void insert(struct LRUCache* obj, struct LRUCacheQueueNode* nd){
+    nd->prev = obj->head;
+    nd->forw = obj->head->forw;
+    obj->head->forw->prev = nd;
+    obj->head->forw = nd;
 }
 
-void insert(struct queueNode* nd){
-    nd->prev = head;
-    nd->forw = head->forw;
-    head->forw->prev = nd;
-    head->forw = nd;
-}
-
-struct queueNode* deleteQueue(){
-    struct queueNode* previousNode = tail->prev;
-    previousNode->prev->forw = tail;
-    tail->prev = previousNode->prev;
+struct LRUCacheQueueNode* deleteQueue(struct LRUCache* obj){
+    struct LRUCacheQueueNode* previousNode = obj->tail->prev;
+    previousNode->prev->forw = obj->tail;
+    obj->tail->prev = previousNode->prev;
     return previousNode;
 }
 
-void deleteHsh(struct LRUCache* obj, struct queueNode* QNode){
+void deleteHsh(struct LRUCache* obj, struct LRUCacheQueueNode* QNode){
     int ind=djb2(QNode->val)%(obj->maxSize);
-    struct hshNode* temp=obj->arr[ind];
+    struct LRUCacheMapNode* temp=obj->map[ind];
     while (temp->nd!=QNode) temp=temp->forw;
-    if (obj->arr[ind]==temp) obj->arr[ind]=temp->forw;
+    if (obj->map[ind]==temp) obj->map[ind]=temp->forw;
     else{
         temp->prev->forw=temp->forw;
         if (temp->forw!=NULL) temp->forw->prev=temp->prev;
@@ -287,83 +295,62 @@ void deleteHsh(struct LRUCache* obj, struct queueNode* QNode){
 void lRUCachePut(struct LRUCache* obj, char* string) {
     int ind=djb2(string)%(obj->maxSize);
     
-    if (obj->arr[ind]!=NULL){
-        struct hshNode* temp=obj->arr[ind];
-        obj->arr[ind]=createHashNode(string);
-        obj->arr[ind]->forw=temp;
-        temp->prev=obj->arr[ind];
+    if (obj->map[ind]!=NULL){
+        struct LRUCacheMapNode* temp=obj->map[ind];
+        obj->map[ind]=createHashNode(string);
+        obj->map[ind]->forw=temp;
+        temp->prev=obj->map[ind];
     }
     else{
-        obj->arr[ind]=createHashNode(string);
+        obj->map[ind]=createHashNode(string);
     }
-    insert(obj->arr[ind]->nd);
+    insert(obj, obj->map[ind]->nd);
     if (obj->size<obj->maxSize) obj->size++;
     else{
-        struct queueNode* QNode=deleteQueue();
+        struct LRUCacheQueueNode* QNode=deleteQueue(obj);
         deleteHsh(obj, QNode);
         free(QNode);
     }
 }
 
-void printQueue(){
-    struct queueNode* temp=head->forw;
-    while (temp!=tail){
+void printHshQueue(struct LRUCacheMapNode* nd){
+    while (nd!=NULL){
+        printf("%s ", nd->nd->val);
+        nd=nd->forw;
+    }
+    printf("\n");
+}
+
+void printCache(struct LRUCache* obj){
+    printf("\nThe elements in Hash Map are:\n");
+    for (int i=0; i<obj->maxSize; i++){
+        if (obj->map[i]!=NULL){
+            printHshQueue(obj->map[i]);
+        }
+        else printf("NULL\n");
+    }
+    printf("\n");
+}
+
+void printQueue(struct LRUCache* obj){
+    printf("\nThe Cache Queue is: ");
+    struct LRUCacheQueueNode* temp=obj->head->forw;
+    while (temp!=obj->tail){
         printf("%s ", temp->val);
         temp=temp->forw;
     }
     printf("\n");
 }
 
-void createQueue(){
-    head=createQueueNode("");
-    tail=createQueueNode("");
-    head->forw=tail;
-    tail->prev=head;
-}
-
-struct hshNode* searchCache(struct LRUCache* obj, char* string){
+struct LRUCacheMapNode* searchCache(struct LRUCache* obj, char* string){
     int ind=djb2(string)%(obj->maxSize);
-    struct hshNode* temp=obj->arr[ind];
+    struct LRUCacheMapNode* temp=obj->map[ind];
     while (temp!=NULL && strcmp(temp->nd->val, string)!=0) temp=temp->forw;
     return temp;
 }
 
-void lRUCacheGet(struct hshNode* temp){
+void LRUCacheGet(struct LRUCache* obj, struct LRUCacheMapNode* temp){
     temp->nd->prev->forw=temp->nd->forw;
     temp->nd->forw->prev=temp->nd->prev;
-    insert(temp->nd);
-}
-
-int suggest(char *word, struct LRUCache* obj, char suggestions[MAX_SUGGESTIONS][MAX_LENGTH + 1]){
-
-    char dict_word[MAX_LENGTH + 1];
-
-    double tempJaroWinklerValue = 0;
-    int tempLevenshteinValue = INT_MAX;
-    FILE *file = fopen("dictionary.txt", "r");
-
-    while (fscanf(file, "%s", dict_word) != EOF){
-        int distance = levenshteinDistance(word, dict_word);
-        double jaroWinklerValue = jaroWinklerDistance(word, dict_word);
-        if (distance < tempLevenshteinValue){
-            tempLevenshteinValue=distance;
-            lRUCachePut(obj, dict_word);
-        }
-        else if (distance == tempLevenshteinValue && jaroWinklerValue >= tempJaroWinklerValue){
-            tempJaroWinklerValue=jaroWinklerValue;
-            lRUCachePut(obj, dict_word);
-        }
-    }
-
-    int num_suggestions = 0;
-    struct queueNode* temp=head->forw;
-    while (temp!=tail){
-        strcpy(suggestions[num_suggestions], temp->val);
-        num_suggestions++;
-        temp=temp->forw;
-    }
-
-    return num_suggestions;
-
-    fclose(file);
+    insert(obj, temp->nd);
 }
