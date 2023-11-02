@@ -4,12 +4,20 @@
 # include <stdint.h>    // for uint32 types etc
 # include <string.h>    // for string manipulation
 # include <ctype.h>     // for formatting
-# include <math.h>
-#include <windows.h>
-# include "spell.h"     // our header file with bloom filter, trie and lru cache functionality
+# include <math.h>      // for some math functions
+# include <pthread.h>   // for multithreading
+# include <windows.h>   // for computational analysis and comparision analysis
+# include "spell.h"     // our header file with bloom filter, trie and lru cache etc functionality
+
+// global variables
 
 // testing the functions for correctness
 int main() {
+    FILE* dict_ptr = fopen("dictionary.txt", "r");
+    if(dict_ptr == NULL) {
+        printf(COLOR_RED "Dictionary doesnt exist or some path/name error occured.\n" COLOR_RESET);
+        return 0;
+    }
     int ch;
     char str[100];
     char word[MAX_LENGTH + 1];
@@ -28,8 +36,8 @@ int main() {
     TRIE_NODE* root=createNode();
     bool* filter = calloc(FILTER_SIZE, sizeof(bool));
 
-    loadDictionary(filter, root);
-    printf(COLOR_BLUE "Dictionary Loaded\n" COLOR_RESET);
+    loadDictionary(dict_ptr, filter, root);
+    printf(COLOR_BLUE "Dictionary loaded successfully.\n" COLOR_RESET);
 
     while (1){
         printf(COLOR_YELLOW "Select the mode you want to enter:-\n1. Spell checking and autocorrect\n2. Comparison mode\n3. Optimisation mode\n4. Quit\n" COLOR_RESET);
@@ -71,7 +79,7 @@ int main() {
                             incrt_words++;
                             printf("%s", " ");
                         }
-                        else{
+                        else {
                             printf(COLOR_GREEN "%s " COLOR_RESET, word);
                             printf("%s", " ");
                         }

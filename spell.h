@@ -9,6 +9,8 @@
 #define N 26    // no. of distinct characters in language
 
 #define INT_MAX 2147483647
+
+// Defining colors for formatting
 #define COLOR_BLUE "\x1b[34m"
 #define COLOR_RED "\x1b[31m"
 #define COLOR_GREEN "\x1b[32m"
@@ -17,23 +19,28 @@
 #define COLOR_YELLOW  "\x1b[33m"
 #define COLOR_RESET "\x1b[0m"
 
-int maxi(int x, int y){
+// helper functions returns min(a, b, c)
+int greater(int x, int y){
     return x>y?x:y;
 }
 
-int mini(int x, int y){
+int smaller(int x, int y){
     return x>y?y:x;
 }
 
+int smallest(int a, int b, int c) {
+    return a < b ? (a < c ? a : c) : (b < c ? b : c);
+}
+
 // hash functions
-uint32_t djb2(const char* string) {
+uint32_t djb2(const char* string) {     // DJB_2 Hash
     uint32_t hash = 5381;
     int c;
     while ((c= *string++)) hash = (hash << 5) + hash + c;    // hash*33 + c
     return hash % FILTER_SIZE;
 }
 
-uint32_t jenkin(const char* str) {
+uint32_t jenkin(const char* str) {      // Jenkin's Hash
     uint32_t hash = 0;
     while(*str) {
         hash += *str++;
@@ -57,10 +64,6 @@ bool searchFilter(bool* filter, char* word) {      // searching in bloom filter
 }
 
 // Trie functions
-int smallest(int a, int b, int c) {      // helper function returns min(a, b, c)
-    return a < b ? (a < c ? a : c) : (b < c ? b : c);
-}
-
 typedef struct node {   // trie node
     struct node *child[26];
     bool isEOW;
@@ -106,14 +109,13 @@ void display(TRIE_NODE* root, char* word, int level){
 }
 
 // populating bloom filter and trie with Dictionary words
-void loadDictionary(bool* filter, TRIE_NODE* root){
-    FILE *file = fopen("dictionary.txt", "r");
-    char word[50];
-    while(fscanf(file, "%s", word) != EOF) {
+void loadDictionary(FILE* dict_ptr, bool* filter, TRIE_NODE* root) {
+    char word[50];      // maximum word lenght
+    while(fscanf(dict_ptr, "%s", word) != EOF) {
         insertFilter(filter, word);
         insertTrie(root, word);
     }
-    fclose(file);
+    fclose(dict_ptr);
 }
 
 int levenshteinDistance(const char *s, const char *t){
@@ -143,32 +145,19 @@ int levenshteinDistance(const char *s, const char *t){
 }
 
 double jaroWinklerDistance(char* s1, char* s2){
-    // If the strings are equal
     if (s1 == s2)
         return 1.0;
- 
-    // Length of two strings
+
     int len1 = strlen(s1), len2 = strlen(s2);
- 
-    // Maximum distance upto which matching
-    // is allowed
-    int max_dist = floor(maxi(len1, len2) / 2) - 1;
- 
-    // Count of matches
+    int max_dist = floor(greater(len1, len2) / 2) - 1;
     int match = 0;
  
-    // Hash for matches
     int* hash_s1 = calloc(len1, sizeof(int));
     int* hash_s2 = calloc(len2, sizeof(int));
  
-    // Traverse through the first string
-    for (int i = 0; i < len1; i++) {
- 
-        // Check if there is any matches
-        for (int j = maxi(0, i - max_dist);
-             j < mini(len2, i + max_dist + 1); j++)
- 
-            // If there is a match
+    for(int i=0; i<len1; i++) {
+        for(int j=greater(0, i - max_dist);
+             j<smaller(len2, i + max_dist + 1); j++)
             if (s1[i] == s2[j] && hash_s2[j] == 0) {
                 hash_s1[i] = 1;
                 hash_s2[j] = 1;
@@ -176,39 +165,19 @@ double jaroWinklerDistance(char* s1, char* s2){
                 break;
             }
     }
- 
-    // If there is no match
-    if (match == 0)
-        return 0.0;
- 
-    // Number of transpositions
-    double t = 0;
- 
+    if (match == 0) return 0.0;
+    
+    double t = 0; 
     int point = 0;
- 
-    // Count number of occurrences
-    // where two characters match but
-    // there is a third matched character
-    // in between the indices
-    for (int i = 0; i < len1; i++)
-        if (hash_s1[i]) {
- 
-            // Find the next matched character
-            // in second string
-            while (hash_s2[point] == 0)
-                point++;
- 
-            if (s1[i] != s2[point++])
-                t++;
+
+    for(int i=0; i < len1; i++)
+        if(hash_s1[i]) {
+            while(hash_s2[point] == 0) point++;
+            if(s1[i] != s2[point++]) t++;
         }
- 
+
     t /= 2;
- 
-    // Return the Jaro Similarity
-    return (((double)match) / ((double)len1)
-            + ((double)match) / ((double)len2)
-            + ((double)match - t) / ((double)match))
-           / 3.0;
+    return (((double)match) / ((double)len1) + ((double)match) / ((double)len2) + ((double)match - t) / ((double)match)) / 3.0;
 }
 
 struct queueNode{
