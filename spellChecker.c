@@ -10,14 +10,50 @@
 # include "spell.h"     // our header file with bloom filter, trie and lru cache etc functionality
 
 // global variables
+// dictionary file name
+char *dict_file = "dictionary.txt";
 
-// testing the functions for correctness
-int main() {
-    FILE* dict_ptr = fopen("dictionary.txt", "r");
-    if(dict_ptr == NULL) {
-        printf(COLOR_RED "Dictionary doesnt exist or some path/name error occured.\n" COLOR_RESET);
-        return 0;
+// analysis/development functions
+int suggest(char *word, struct LRUCache* obj, char suggestions[MAX_SUGGESTIONS][MAX_LENGTH + 1]){
+
+    char dict_word[MAX_LENGTH + 1];
+
+    double tempJaroWinklerValue = 0;
+    int tempLevenshteinValue = INT_MAX;
+    FILE *file = fopen("dictionary.txt", "r");
+
+    while (fscanf(file, "%s", dict_word) != EOF){
+        int distance = levenshteinDistance(word, dict_word);
+        double jaroWinklerValue = jaroWinklerDistance(word, dict_word);
+        if (distance < tempLevenshteinValue){
+            tempLevenshteinValue=distance;
+            lRUCachePut(obj, dict_word);
+        }
+        else if (distance == tempLevenshteinValue && jaroWinklerValue >= tempJaroWinklerValue){
+            tempJaroWinklerValue=jaroWinklerValue;
+            lRUCachePut(obj, dict_word);
+        }
     }
+
+    int num_suggestions = 0;
+    struct queueNode* temp=head->forw;
+    while (temp!=tail){
+        strcpy(suggestions[num_suggestions], temp->val);
+        num_suggestions++;
+        temp=temp->forw;
+    }
+
+    return num_suggestions;
+
+    fclose(file);
+}
+
+int main() {
+    // loading dictionary on bloom filter and trie
+    TRIE_NODE* root=createNode();
+    bool* filter = calloc(FILTER_SIZE, sizeof(bool));
+    loadDictionary(dict_file, filter, root);
+    printf(COLOR_BLUE "Dictionary loaded successfully.\n" COLOR_RESET);
     int ch;
     char str[100];
     char word[MAX_LENGTH + 1];
@@ -33,11 +69,6 @@ int main() {
 
     createQueue();
     struct LRUCache* cache=lRUCacheCreate(MAX_SUGGESTIONS);
-    TRIE_NODE* root=createNode();
-    bool* filter = calloc(FILTER_SIZE, sizeof(bool));
-
-    loadDictionary(dict_ptr, filter, root);
-    printf(COLOR_BLUE "Dictionary loaded successfully.\n" COLOR_RESET);
 
     while (1){
         printf(COLOR_YELLOW "Select the mode you want to enter:-\n1. Spell checking and autocorrect\n2. Comparison mode\n3. Optimisation mode\n4. Quit\n" COLOR_RESET);

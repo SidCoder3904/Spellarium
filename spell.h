@@ -1,3 +1,4 @@
+# include <pthread.h>
 // Bloom Filter variables
 #define FILTER_SIZE 10000000
 #define K 8     // no. of hash functions
@@ -108,14 +109,47 @@ void display(TRIE_NODE* root, char* word, int level){
     }
 }
 
-// populating bloom filter and trie with Dictionary words
-void loadDictionary(FILE* dict_ptr, bool* filter, TRIE_NODE* root) {
+typedef struct filter_args {
+    char* dict;
+    bool* filter;
+} FILTER_ARGS;
+
+typedef struct trie_args {
+    char* dict;
+    TRIE_NODE* root;
+} TRIE_ARGS;
+
+void* filterThread(void* arg) {
     char word[50];      // maximum word lenght
-    while(fscanf(dict_ptr, "%s", word) != EOF) {
-        insertFilter(filter, word);
-        insertTrie(root, word);
-    }
-    fclose(dict_ptr);
+    FILTER_ARGS* args = (FILTER_ARGS*) arg;
+    char* dict_file = args->dict;
+    FILE* dict_ptr = fopen(dict_file, "r");
+    bool* filter = args->filter;
+    while(fscanf(dict_ptr, "%s", word) != EOF) insertFilter(filter, word);
+    printf(COLOR_GREEN "Dictionary loaded on filter successfully\n" COLOR_RESET);
+    return NULL;
+}
+
+void* trieThread(void* arg) {
+    char word[50];      // maximum word lenght
+    TRIE_ARGS* args = (TRIE_ARGS*) arg;
+    char* dict_file = args->dict;
+    FILE* dict_ptr = fopen(dict_file, "r");
+    TRIE_NODE* root = args->root;
+    while(fscanf(dict_ptr, "%s", word) != EOF) insertTrie(root, word);
+    printf(COLOR_GREEN "Dictionary loaded on trie successfully\n" COLOR_RESET);
+    return NULL;
+}
+
+// populating bloom filter and trie with Dictionary words
+void loadDictionary(char* dict_file, bool* filter, TRIE_NODE* root) {
+    pthread_t filter_thread, trie_thread;
+    FILTER_ARGS filter_args = {dict_file, filter};
+    TRIE_ARGS trie_args = {dict_file, root};
+    if(pthread_create(&filter_thread, NULL, filterThread, &filter_args) & pthread_create(&trie_thread, NULL, trieThread, &trie_args)) printf(COLOR_RED "Error occured in threading\n" COLOR_RESET);
+    if(pthread_join(filter_thread, NULL) & pthread_join(trie_thread, NULL)) printf(COLOR_RED "Error occured in threading\n" COLOR_RESET);
+    filter = filter_args.filter;
+    root = trie_args.root;
 }
 
 int levenshteinDistance(const char *s, const char *t){
