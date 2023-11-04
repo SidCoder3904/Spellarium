@@ -1,4 +1,7 @@
-# include <pthread.h>
+// dictionary file name
+#define DICT_FILE "dictionary.txt"
+#define PARA_FILE "paragraph.txt"
+
 // Bloom Filter variables
 #define FILTER_SIZE 10000000
 #define K 8     // no. of hash functions
@@ -10,6 +13,9 @@
 #define N 26    // no. of distinct characters in language
 
 #define INT_MAX 2147483647
+
+// MultiThreading variables
+#define N_THREADS 4
 
 // Defining colors for formatting
 #define COLOR_BLUE "\x1b[34m"
@@ -109,47 +115,35 @@ void display(TRIE_NODE* root, char* word, int level){
     }
 }
 
-typedef struct filter_args {
-    char* dict;
-    bool* filter;
-} FILTER_ARGS;
-
-typedef struct trie_args {
-    char* dict;
-    TRIE_NODE* root;
-} TRIE_ARGS;
-
-void* filterThread(void* arg) {
+void* filterThread(void* filter) {
     char word[50];      // maximum word lenght
-    FILTER_ARGS* args = (FILTER_ARGS*) arg;
-    char* dict_file = args->dict;
-    FILE* dict_ptr = fopen(dict_file, "r");
-    bool* filter = args->filter;
-    while(fscanf(dict_ptr, "%s", word) != EOF) insertFilter(filter, word);
+    FILE* dict_ptr = fopen(DICT_FILE, "r");
+    if(dict_ptr == NULL) {
+        perror(COLOR_RED "Error loading Dictionary\n" COLOR_RESET);
+        exit(1);
+    }
+    while(fscanf(dict_ptr, "%s", word) != EOF) insertFilter((bool*) filter, word);
     printf(COLOR_GREEN "Dictionary loaded on filter successfully\n" COLOR_RESET);
     return NULL;
 }
 
-void* trieThread(void* arg) {
+void* trieThread(void* root) {
     char word[50];      // maximum word lenght
-    TRIE_ARGS* args = (TRIE_ARGS*) arg;
-    char* dict_file = args->dict;
-    FILE* dict_ptr = fopen(dict_file, "r");
-    TRIE_NODE* root = args->root;
-    while(fscanf(dict_ptr, "%s", word) != EOF) insertTrie(root, word);
+    FILE* dict_ptr = fopen(DICT_FILE, "r");
+    if(dict_ptr == NULL) {
+        perror(COLOR_RED "Error loading Dictionary or wrong path/file for dictionary\n" COLOR_RESET);
+        exit(1);
+    }
+    while(fscanf(dict_ptr, "%s", word) != EOF) insertTrie((TRIE_NODE*) root, word);
     printf(COLOR_GREEN "Dictionary loaded on trie successfully\n" COLOR_RESET);
     return NULL;
 }
 
 // populating bloom filter and trie with Dictionary words
-void loadDictionary(char* dict_file, bool* filter, TRIE_NODE* root) {
+void loadDictionary(bool* filter, TRIE_NODE* root) {
     pthread_t filter_thread, trie_thread;
-    FILTER_ARGS filter_args = {dict_file, filter};
-    TRIE_ARGS trie_args = {dict_file, root};
-    if(pthread_create(&filter_thread, NULL, filterThread, &filter_args) & pthread_create(&trie_thread, NULL, trieThread, &trie_args)) printf(COLOR_RED "Error occured in threading\n" COLOR_RESET);
+    if(pthread_create(&filter_thread, NULL, filterThread, filter) & pthread_create(&trie_thread, NULL, trieThread, root)) printf(COLOR_RED "Error occured in threading\n" COLOR_RESET);
     if(pthread_join(filter_thread, NULL) & pthread_join(trie_thread, NULL)) printf(COLOR_RED "Error occured in threading\n" COLOR_RESET);
-    filter = filter_args.filter;
-    root = trie_args.root;
 }
 
 int levenshteinDistance(const char *s, const char *t){
@@ -334,36 +328,73 @@ void lRUCacheGet(struct hshNode* temp){
     insert(temp->nd);
 }
 
-int suggest(char *word, struct LRUCache* obj, char suggestions[MAX_SUGGESTIONS][MAX_LENGTH + 1]){
+typedef struct suggest_thread {
+    int thread_num;
+    struct LRUCache* cache;
+    char* suggestions;
+} THREAD_INP;
 
-    char dict_word[MAX_LENGTH + 1];
+// Function to break a part of the file into words
+void processPart(char* part, struct LRUCache* cache, char suggestions[MAX_SUGGESTIONS][MAX_LENGTH + 1]) {
+    char word[MAX_LENGTH];
+    const char* delimiters = " \t\n";
+    const char* token = strtok(part, delimiters);
 
-    double tempJaroWinklerValue = 0;
-    int tempLevenshteinValue = INT_MAX;
-    FILE *file = fopen("dictionary.txt", "r");
+    while (token != NULL) {
+        strncpy(word, token, MAX_LENGTH);
+        store_suggestions(word, cache, suggestions);
+        token = strtok(NULL, delimiters);
+    }
+    // printf("**im done**");
+}
 
-    while (fscanf(file, "%s", dict_word) != EOF){
-        int distance = levenshteinDistance(word, dict_word);
-        double jaroWinklerValue = jaroWinklerDistance(word, dict_word);
-        if (distance < tempLevenshteinValue){
-            tempLevenshteinValue=distance;
-            lRUCachePut(obj, dict_word);
-        }
-        else if (distance == tempLevenshteinValue && jaroWinklerValue >= tempJaroWinklerValue){
-            tempJaroWinklerValue=jaroWinklerValue;
-            lRUCachePut(obj, dict_word);
+void* processFile(void* thread_inp) {
+    // int thread_num = *(int*)arg;
+    THREAD_INP* input = (THREAD_INP*) thread_inp;
+    FILE* file = fopen(PARA_FILE, "r");
+    if(file == NULL) {
+        perror(COLOR_RED "Error opening paragraph file" COLOR_RESET);
+        exit(1);
+    }
+
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    long part = file_size / N_THREADS;
+    long start = part * input->thread_num;
+    long end = input->thread_num < N_THREADS - 1 ? start + part : file_size;
+
+    if(input->thread_num > 0) {
+        fseek(file, start, SEEK_SET);
+        while(start < end) {
+            int c = fgetc(file);
+            if(c == ' ' || c == '\t' || c == '\n') break;
+            start++;
         }
     }
 
-    int num_suggestions = 0;
-    struct queueNode* temp=head->forw;
-    while (temp!=tail){
-        strcpy(suggestions[num_suggestions], temp->val);
-        num_suggestions++;
-        temp=temp->forw;
-    }
-
-    return num_suggestions;
-
+    // Read and process the part
+    fseek(file, start, SEEK_SET);
+    char* chunk = (char*) malloc((end-start+1) * sizeof(char));
+    fread(chunk, 1, end - start, file);
+    chunk[end-start] = '\0';
     fclose(file);
+
+    processPart(chunk, (struct LRUCache*) input->cache, (char*) input->suggestions);
+
+    free(chunk);
+    return NULL;
+}
+
+void part_file(struct LRUCache* cache, char suggestions[MAX_SUGGESTIONS][MAX_LENGTH + 1]) {     // size is number of elements probably put -1 for size not known
+    pthread_t threads[N_THREADS];
+    THREAD_INP thread_inp[N_THREADS];
+    for(int i=0; i<N_THREADS; i++) {
+        thread_inp[i].thread_num = i;
+        thread_inp[i].cache = cache;
+        thread_inp[i].suggestions = suggestions;
+        pthread_create(&threads[i], NULL, processFile, &thread_inp[i]);
+    }
+    for(int i=0; i<N_THREADS; i++) pthread_join(threads[i], NULL);
 }
